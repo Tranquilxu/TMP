@@ -1,0 +1,9 @@
+scipy
+ftfy
+regex
+tqdm
+torch
+torchvision
+tqdm
+monai
+clip @ git+https://github.com/openai/CLIP.git
