@@ -1,6 +1,6 @@
 from typing import Dict, Tuple
 from torch.utils.data import DataLoader
-from dataset_loader import get_transform, read_data_cifar_100, read_data_eruosat, read_data_tiny_imagenet_200, \
+from dataset_loader import get_transform, read_data_cifar_100, read_data_tiny_imagenet_200, \
     read_data_stanford_cars, read_data_caltech_101, read_data_food_101, CIFAR100_handler_test, DatasetHandlerTest
 
 
@@ -26,7 +26,7 @@ def get_data_handler(dataset, pattern, input_size):
         elif pattern == "val":
             datahandler = DatasetHandlerTest(test_data, test_label, get_transform(input_size))
 
-    return datahandlers
+    return datahandler
 
 
 def load_datasets(

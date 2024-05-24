@@ -4,7 +4,7 @@ import torch
 from torch.utils.data import Dataset
 import torchvision.transforms as transforms
 from PIL import Image
-from dataset_loader import read_data_cifar_100, read_data_tiny_imagenet_200, read_data_eruosat, read_data_stanford_cars, \
+from dataset_loader import read_data_cifar_100, read_data_tiny_imagenet_200, read_data_stanford_cars, \
     read_data_caltech_101, read_data_food_101, load_datasets
 from PaPi.utils import Cutout
 from PaPi.autoaugment import CIFAR10Policy, ImageNetPolicy

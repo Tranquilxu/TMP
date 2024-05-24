@@ -22,8 +22,6 @@ def step_lr_schedule(optimizer, epoch, init_lr, min_lr, decay_rate):
         param_group['lr'] = lr
 
 
-import numpy as np
-import io
 import os
 import time
 from collections import defaultdict, deque

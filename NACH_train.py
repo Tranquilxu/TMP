@@ -4,7 +4,7 @@ import torch.nn.functional as F
 from pathlib import Path
 from torch.utils.data import DataLoader
 import torch
-from train_clip_tf_labels import print_write
+from TMP_train import print_write
 from utils import step_lr_schedule
 from dataset_loader import load_taglist, load_datasets
 from clip import clip
@@ -13,7 +13,7 @@ from sklearn import metrics
 import numpy as np
 from torch.utils.tensorboard import SummaryWriter
 from itertools import cycle
-from cls_model import MLP_clip
+from cls_model import Linear
 from NACH.nach_dataloader import divide_labeled_or_not
 import os
 
@@ -272,7 +272,7 @@ def main():
     for params in clip_model.parameters():
         params.requires_grad = False
 
-    model = MLP_clip(input_dim=768, output_dim=num_classes)
+    model = Linear(input_dim=768, output_dim=num_classes)
     model.to(device)
 
     optimizer = torch.optim.AdamW([{'params': model.parameters()}], lr=1e-3, weight_decay=0.05)

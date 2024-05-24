@@ -2,8 +2,6 @@ import torch
 import torch.nn as nn
 import numpy as np
 from scipy.optimize import linear_sum_assignment
-import os
-import os.path
 import torch.nn.functional as F
 
 

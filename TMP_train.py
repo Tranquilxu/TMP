@@ -10,7 +10,7 @@ from torch.nn import Module
 from tqdm import tqdm
 from utils import step_lr_schedule, accuracy
 from dataset_loader import load_datasets, Generate_data
-from cls_model import MLP_clip, image_input
+from cls_model import Linear, image_input
 
 from monai.utils import set_determinism
 
@@ -25,8 +25,8 @@ def parse_args():
     # data
     parser.add_argument("--dataset", type=str,
                         choices=(
-                        "CIFAR100", "tiny-imagenet-200", "stanford_cars", "caltech-101", "food-101"),
-                        default="food-101")
+                            "CIFAR100", "tiny-imagenet-200", "stanford_cars", "caltech-101", "food-101"),
+                        default="tiny-imagenet-200")
     parser.add_argument("--input-size", type=int, default=224, choices=(224, 384))
     # threshold
 
@@ -92,7 +92,7 @@ def build_clip_label_embedding(model, categories):
             texts = [
                 "This is " + text if text.startswith("a") or text.startswith("the") else text
                 for text in texts
-            ]  
+            ]
             texts = clip.tokenize(texts)  # tokenize
             # print("texts =", texts.size())
             if run_on_gpu:
@@ -130,32 +130,23 @@ def test_model(clip_model, model, test_loader, taglist, x_img, learned_img_epoch
     # inference
 
     final_logits = torch.empty(len(test_loader.dataset), num_classes)
-    # final_logits = torch.empty(len(test_loader.dataset))
     targs = torch.empty(len(test_loader.dataset))
     pos = 0
     input_image = torch.ones(1, 1, 224, 224).to(device)
     label_embed_or = build_clip_label_embedding(clip_model, taglist)
     learned_text_epoch = learn_text(text_tag_num, clip_model.encode_image(x_img(input_image)).to(device),
                                     label_embed_or, taglist, clip_model, dataset_name=args.dataset)
-    # label_embed_or = build_clip_label_embedding(clip_model, taglist)
     for (imgs, labels) in tqdm(test_loader, desc="Test"):
         imgs = imgs.to(device)
         labels = labels.to(device)
         learned_text = learned_text_epoch.repeat(imgs.size()[0], 1, 1).to(device)
         learned_img = learned_img_epoch.repeat(imgs.size()[0], 1, 1).to(device)
         label_embed_input = clip_model.encode_image(x_img(input_image)).repeat(imgs.size()[0], 1, 1).to(device)
-        # label_embed_input = x_img(input_image).repeat(imgs.size()[0], 1, 1, 1).to(device)
 
-        # labels = torch.tensor(labels, dtype=torch.float32)
 
         image_embeds = clip_model.encode_image(imgs).unsqueeze(1)
         image_embeds = image_embeds.to(device)
-        # image_embeds = image_embeds + label_embed_input
-        # feature = torch.flatten(image_embeds, 1, -1).float()
-        label_embed = label_embed_or.repeat(imgs.size()[0], 1, 1)
-        label_embed = label_embed.to(device)
 
-        # feature = torch.flatten(torch.cat((image_embeds, label_embed_input, label_embed), dim=1), 1, -1).float()
         feature = torch.flatten(torch.cat((image_embeds, label_embed_input, learned_text, learned_img), dim=1), 1,
                                 -1).float()
         logits = model(feature)
@@ -163,7 +154,6 @@ def test_model(clip_model, model, test_loader, taglist, x_img, learned_img_epoch
         bs = imgs.shape[0]
 
         final_logits[pos:pos + bs, :] = logits.cpu()
-        # targs[pos:pos + bs, :] = F.one_hot(labels.to(torch.int64), num_classes).cpu() * 2 - 1
         targs[pos:pos + bs] = labels.cpu()
         pos += bs
 
@@ -178,14 +168,14 @@ def zero_shot_test_model(clip_model, test_loader, taglist):
 
     # inference
     final_logits = torch.empty(len(test_loader.dataset), num_classes)
-    # final_logits = torch.empty(len(test_loader.dataset))
+
     targs = torch.empty(len(test_loader.dataset))
     pos = 0
     label_embed_or = build_clip_label_embedding(clip_model, taglist)
     for (imgs, labels) in tqdm(test_loader, desc="Test"):
         imgs = imgs.to(device)
         labels = labels.to(device)
-        # labels = torch.tensor(labels, dtype=torch.float32)
+
 
         image_embeds = clip_model.encode_image(imgs).unsqueeze(1)
         image_embeds = image_embeds.to(device)
@@ -194,16 +184,15 @@ def zero_shot_test_model(clip_model, test_loader, taglist):
         label_embed = label_embed.to(device)
 
         image_to_label = image_embeds.repeat(1, num_classes, 1)
-        # print("image_to_label_F", image_to_label_F.size())
-        # print("label_embed_F", label_embed_F.size())
+
         output = cos(image_to_label, label_embed)
-        # print("torch.max(output,dim = 1)", torch.max(output, dim=1))
+
         _, labels_g = torch.max(output, dim=1)
 
         bs = imgs.shape[0]
         labels_g = F.one_hot(labels_g.to(torch.int64), num_classes=num_classes).cuda() * 2 - 1
         final_logits[pos:pos + bs, :] = labels_g.cpu()
-        # targs[pos:pos + bs, :] = F.one_hot(labels.to(torch.int64), num_classes).cpu() * 2 - 1
+
         targs[pos:pos + bs] = labels.cpu()
         pos += bs
 
@@ -218,23 +207,21 @@ def RC_loss(logits_F, labels_F, output):
 
     for i in range(num_classes):
         value = m_loss(logits_F, torch.ones(labels_F.size()).long().to(device) * i)
-        # print("value", value.size())
-        # print("output[:, 0]", output[:, i].size())
+
         loss = loss + torch.inner(value.float(), output[:, i].float())
-        # print("loss", loss)
+
     loss_rf = m_loss(logits_F, labels_F)
-    # print("labels_F", labels_F.size())
+
     loss_tf = 0
     for j in range(len(labels_F)):
         loss_tf = loss_tf + output[j, labels_F[j]].float() * loss_rf[j]
-    # print("loss_tf", loss_tf)
+
     loss = loss - loss_tf
     return loss
 
 
 def RC_train_model(imgs, labels, labels_t, model, image_embed_input, label_embed_label, ce_loss, cos, soft, epoch,
                    learned_text, learned_img):
-    # c_loss = nn.MSELoss(reduction='sum').cuda()
 
     mask_T = torch.where(labels_t == 1)[0].to(device)
     mask_F = torch.where(labels_t == 0)[0].to(device)
@@ -245,26 +232,17 @@ def RC_train_model(imgs, labels, labels_t, model, image_embed_input, label_embed
     image_embeds = clip_model.encode_image(imgs).unsqueeze(1)
     image_embeds = image_embeds.to(device)
 
-    # label_embed_input = label_embed_input.repeat(image_embeds.size()[0], 1, 1).to(device)
-    # label_embed_input = label_embed_input.to(device)
-    # print("label_embed_input", label_embed_input.size())
-    # print("image_embeds", image_embeds.size())
+
     feature = torch.flatten(torch.cat((image_embeds, image_embed_input, learned_text, learned_img), dim=1), 1,
                             -1).float()
-    # print("feature", feature.size())
-    # feature = torch.flatten(torch.cat((image_embeds, image_embed_input), dim=1), 1, -1).float()
-    # image_embeds_model = image_embeds + label_embed_input
-    # feature = torch.flatten(image_embeds_model, 1, -1).float()
+
 
     logits = model(feature)
-
-    # loss = c_loss(logits, labels, num_classes)
 
     logits_T = torch.index_select(logits, dim=0, index=mask_T)
     logits_F = torch.index_select(logits, dim=0, index=mask_F)
     labels_T = torch.index_select(labels, dim=0, index=mask_T)
     labels_F = torch.index_select(labels, dim=0, index=mask_F)
-
 
     image_embeds_F = torch.index_select(image_embeds, dim=0, index=mask_F)
     image_embeds_F = image_embeds_F.to(device)
@@ -280,8 +258,7 @@ def RC_train_model(imgs, labels, labels_t, model, image_embed_input, label_embed
     output_f = logits_F.detach()
     output_f = soft(output_f / tau)
     lambda_a = 0.1
-    output = lambda_a * output_f + (1-lambda_a) * output
-
+    output = lambda_a * output_f + (1 - lambda_a) * output
 
     if len(logits_T) != 0:
         loss_T = ce_loss(logits_T, labels_T)
@@ -297,14 +274,12 @@ def learn_text(text_tag_num, label_embed_or, label_embed_ot, taglist, clip_model
         f.write("")
     cos = nn.CosineSimilarity(dim=1, eps=1e-6)
     taglist_new = []
-    # tensor_tag = torch.tensor(taglist)
+
     out = label_embed_or.repeat(label_embed_ot.size()[0], 1)
-    # print("out size", out.size())
-    # print("label_embed_ot", label_embed_ot.size())
+
     output = cos(out, label_embed_ot)
     value, index = torch.topk(output, k=int(num_classes * 0.6))
-    # print("index", index.size())
-    # print("torch.max(output,dim = 0)", value, index)
+
     for j in range(len(index)):
         taglist_new.append(taglist[index[j]])
     taglist_new = list(set(taglist_new))
@@ -327,22 +302,20 @@ def learn_img(img_tag_num, label_embed_or, clip_model, input_size, sampler, data
     if random_num >= len(sampler):
         random_num = int(len(sampler) * 0.1)
     gen_data = Generate_data(input_size, sampler, random_num, dataset_name).to(device)
-    # gen_data = torch.tensor(gen_data)
+
     label_embed_gen = clip_model.encode_image(gen_data).to(device)
     cos = nn.CosineSimilarity(dim=1, eps=1e-6)
 
-    # tensor_tag = torch.tensor(taglist)
+
     out = label_embed_or.repeat(gen_data.size()[0], 1)
-    # print("out size", out.size())
-    # print("label_embed_ot", label_embed_ot.size())
+
     output = cos(out, label_embed_gen)
     value, index = torch.topk(output, k=40)
-    # print("index", index.size())
-    # print("torch.max(output,dim = 0)", value, index)
+
     img_embed = torch.ones(img_tag_num, len(label_embed_gen[1]))
     for j in range(img_tag_num):
         img_embed[j] = label_embed_gen[index[j]]
-    # print("img_embed", img_embed.size())
+
     return img_embed
 
 
@@ -407,7 +380,7 @@ if __name__ == "__main__":
         text_tag_num = int(num_classes * 0.2)
     img_tag_num = 5
 
-    model = MLP_clip(input_dim=768 * (text_tag_num + img_tag_num + 2), output_dim=num_classes)
+    model = Linear(input_dim=768 * (text_tag_num + img_tag_num + 2), output_dim=num_classes)
 
     x_img = image_input().to(device)
 
@@ -457,7 +430,6 @@ if __name__ == "__main__":
             learned_text = learned_text_epoch.repeat(imgs.size()[0], 1, 1).to(device)
             learned_img = learned_img_epoch.repeat(imgs.size()[0], 1, 1).to(device)
             image_embed_input = clip_model.encode_image(x_img(input_image)).repeat(imgs.size()[0], 1, 1).to(device)
-
 
             loss = RC_train_model(imgs, labels, labels_t, model, image_embed_input, label_embed_label, ce_loss, cos,
                                   soft, epoch, learned_text, learned_img)

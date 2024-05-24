@@ -3,7 +3,7 @@ from torch.utils.data import Dataset, Subset
 import numpy as np
 from PIL import Image
 import random
-from dataset_loader import read_data_cifar_100, read_data_tiny_imagenet_200, read_data_eruosat, read_data_stanford_cars, \
+from dataset_loader import read_data_cifar_100, read_data_tiny_imagenet_200, read_data_stanford_cars, \
     read_data_caltech_101, read_data_food_101
 from torchvision.transforms import Normalize, Compose, Resize, ToTensor, RandomCrop, RandomHorizontalFlip
 from ocra.utils import TransformTwice

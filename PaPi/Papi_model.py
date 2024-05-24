@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from clip import clip
-from cls_model import MLP_clip
+from cls_model import Linear
 
 
 class PaPi(nn.Module):
@@ -76,7 +76,7 @@ class PaPiNet(nn.Module):
             params.requires_grad = False
         self.encoder = clip_model
 
-        self.fc = MLP_clip(768, num_classes)
+        self.fc = Linear(768, num_classes)
         if head == 'linear':
             self.head = nn.Linear(768, feat_dim)
         elif head == 'mlp':

@@ -2,7 +2,7 @@ import argparse
 import time
 from pathlib import Path
 import torch
-from train_clip_tf_labels import print_write
+from TMP_train import print_write
 from dataset_loader import load_taglist
 import numpy as np
 from PaPi.Papi_dataloader import load_data

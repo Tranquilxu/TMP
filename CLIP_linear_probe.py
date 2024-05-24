@@ -5,10 +5,10 @@ from clip import clip
 from torch.utils.data import DataLoader
 import torch
 from tqdm import tqdm
-from train_clip_tf_labels import print_write
+from TMP_train import print_write
 from utils import step_lr_schedule, accuracy
 from dataset_loader import load_taglist, divide_labeled_or_not, load_datasets
-from cls_model import MLP_clip
+from cls_model import Linear
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
 
@@ -101,7 +101,7 @@ if __name__ == '__main__':
     for params in clip_model.parameters():
         params.requires_grad = False
 
-    model = MLP_clip(input_dim=768, output_dim=num_classes)
+    model = Linear(input_dim=768, output_dim=num_classes)
     model.to(device)
 
     ce_loss = torch.nn.CrossEntropyLoss()
