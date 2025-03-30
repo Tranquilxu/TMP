@@ -82,7 +82,7 @@ def build_clip_label_embedding(model, categories):
             texts = [
                 "This is " + text if text.startswith("a") or text.startswith("the") else text
                 for text in texts
-            ]  # 改造句子
+            ]  
             texts = clip.tokenize(texts)  # tokenize
             # print("texts =", texts)
             if run_on_gpu:
